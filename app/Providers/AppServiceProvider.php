@@ -32,5 +32,7 @@ class AppServiceProvider extends ServiceProvider
             PageResource::navigationSort(1);
             PageResource::navigationIcon('heroicon-o-cube');
         }
+
+        
     }
 }

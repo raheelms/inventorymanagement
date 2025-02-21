@@ -82,6 +82,10 @@ class Product extends Model implements Viewable
        'status' => ProductStatus::class,
        'tags' => 'array',
        'data' => 'array',
+       'is_visible' => 'boolean',
+       'is_featured' => 'boolean',
+       'in_stock' => 'boolean',
+       'on_sale' => 'boolean',
    ];
 
    /**

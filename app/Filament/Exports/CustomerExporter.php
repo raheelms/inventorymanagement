@@ -14,27 +14,24 @@ class CustomerExporter extends Exporter
     public static function getColumns(): array
     {
         return [
-            // ExportColumn::make('name'),
             ExportColumn::make('first_name'),
             ExportColumn::make('last_name'),
             ExportColumn::make('email'),
-            // ExportColumn::make('email_verified_at'),
-            // ExportColumn::make('password'),
-            // ExportColumn::make('company_name'),
-            // ExportColumn::make('phone_number'),
-            // ExportColumn::make('group'),
-            // ExportColumn::make('shipping_street_name'),
-            // ExportColumn::make('shipping_house_number'),
-            // ExportColumn::make('shipping_postal_code'),
-            // ExportColumn::make('shipping_city'),
-            // ExportColumn::make('shipping_country'),
-            // ExportColumn::make('use_shipping_address'), // boolean
-            // ExportColumn::make('billing_street_name'),
-            // ExportColumn::make('billing_house_number'),
-            // ExportColumn::make('billing_address'),
-            // ExportColumn::make('billing_city'),
-            // ExportColumn::make('billing_country'),
-            // Exportcolumn::make('data'), // json
+            ExportColumn::make('company_name'),
+            ExportColumn::make('phone_number'),
+            ExportColumn::make('group'),
+            ExportColumn::make('shipping_street_name'),
+            ExportColumn::make('shipping_house_number'),
+            ExportColumn::make('shipping_postal_code'),
+            ExportColumn::make('shipping_city'),
+            ExportColumn::make('shipping_country'),
+            ExportColumn::make('use_shipping_address'),
+            ExportColumn::make('billing_street_name'),
+            ExportColumn::make('billing_house_number'),
+            ExportColumn::make('billing_postal_code'),
+            ExportColumn::make('billing_city'),
+            ExportColumn::make('billing_country'),
+            ExportColumn::make('data'),
         ];
     }
 

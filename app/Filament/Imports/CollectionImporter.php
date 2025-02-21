@@ -28,12 +28,12 @@ class CollectionImporter extends Importer
 
     public function resolveRecord(): ?Collection
     {
-        // return Collection::firstOrNew([
-        //     // Update existing records, matching them by `$this->data['column_name']`
-        //     'email' => $this->data['email'],
-        // ]);
-
-        return new Collection();
+        return Collection::firstOrNew([
+            // Update existing records, matching them by `$this->data['column_name']`
+            'name' => $this->data['name']
+        ],[
+            'description' => $this->data['description']
+        ]);
     }
 
     public static function getCompletedNotificationBody(Import $import): string

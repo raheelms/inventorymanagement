@@ -16,22 +16,23 @@ class ProductExporter extends Exporter
         return [
             ExportColumn::make('name'),
             // ExportColumn::make('slug'),
+            ExportColumn::make('collections'),
             // ExportColumn::make('description'),
             // ExportColumn::make('images'), // json
             ExportColumn::make('price'),
             // ExportColumn::make('discount_price'),
             // ExportColumn::make('discount_to'),
             // ExportColumn::make('taxes'),
-            Exportcolumn::make('sku'),
-            Exportcolumn::make('stock'),
-            Exportcolumn::make('safety_stock'),
-            // Exportcolumn::make('status'), // enum: 'published', 'draft', 'archived', 'discontinued'
-            // Exportcolumn::make('is_visible'), // boolean
-            // Exportcolumn::make('is_featured'), // boolean
-            // Exportcolumn::make('in_stock'), // boolean
-            // Exportcolumn::make('on_sale'), // boolean
-            // Exportcolumn::make('tags'), // json
-            // Exportcolumn::make('data'), // json
+            ExportColumn::make('sku'),
+            ExportColumn::make('stock'),
+            ExportColumn::make('safety_stock'),
+            ExportColumn::make('status'), // enum: 'published', 'draft', 'archived', 'discontinued'
+            ExportColumn::make('is_visible'), // boolean
+            ExportColumn::make('is_featured'), // boolean
+            ExportColumn::make('in_stock'), // boolean
+            ExportColumn::make('on_sale'), // boolean
+            // ExportColumn::make('tags'), // json
+            // ExportColumn::make('data'), // json
         ];
     }
 
