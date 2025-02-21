@@ -49,7 +49,7 @@ class ProductImporter extends Importer
     {
         // Log the raw import data for debugging
         Log::info('Raw Import Data', ['data' => $this->data]);
-
+    
         try {
             // Manually parse the CSV row if it's a string
             if (is_string($this->data['row_data'] ?? null)) {
@@ -57,52 +57,25 @@ class ProductImporter extends Importer
             } else {
                 $parsedData = $this->data;
             }
-
+    
+            // Log parsed data for additional visibility
+            Log::info('Parsed CSV Data', ['parsedData' => $parsedData]);
+    
             // Sanitize and validate data
             $record = $this->sanitizeImportData($parsedData);
-            \Log::info($record);
+            
+            // Log sanitized record
+            Log::info('Sanitized Record', ['record' => $record]);
+    
             if($record['sku'])
             {
                 // Create or update product
                 $product = Product::updateOrCreate(
                     ['sku' => $record['sku']],
-                   [
-                    'name' => $record['name'],
-                    'slug' => Str::slug($record['name']),
-                    'description' => $record['description'],
-                    'user_id' => $record['user_id'],
-                    'images' => $record['images'],
-                    'price' => $record['price'],
-                    'stock' => $record['stock'],
-                    'safety_stock' => $record['safety_stock'],
-                    'status' => $record['status'],
-                    'is_visible' => $record['is_visible'],
-                    'is_featured' => $record['is_featured'],
-                    'in_stock' => $record['in_stock'],
-                    'on_sale' => $record['on_sale'],
-                    'published_at' => now(),
-                    'taxes' => $record['taxes'],
-                    'discount_price' => $record['discount_price'],
-                    'discount_to' => $record['discount_to'],
-                   ]
+                    $record
                 );
                 return $product;
             }
-           
-
-            // \Log::info($product);
-
-            // // Update existing product
-            // if ($product->exists) {
-            //     $product->fill($this->getProductUpdateData($data));
-            // }
-
-            // $product->save();
-
-            // Handle collections
-            // $this->syncProductCollections($product, $data['collections']);
-
-            // return $product;
         } catch (\Exception $e) {
             Log::error('Product Import Error', [
                 'message' => $e->getMessage(),
@@ -246,33 +219,42 @@ class ProductImporter extends Importer
 
     protected function parseBool($value): int
     {
-        // If already a boolean, convert to integer
+        // If the value is already an integer, return it
+        if (is_int($value)) {
+            return $value ? 1 : 0;
+        }
+    
+        // If it's already a boolean, convert to integer
         if (is_bool($value)) {
             return $value ? 1 : 0;
         }
-
+    
         // If it's a string, convert it
         if (is_string($value)) {
             $value = strtolower(trim($value));
             
-            // Check for various true representations
+            // Explicit true values
             $trueValues = ['1', 'true', 'yes', 'y', 'on'];
-            $falseValues = ['0', 'false', 'no', 'n', 'off', 'false'];
-
+            
+            // Explicit false values
+            $falseValues = ['0', 'false', 'no', 'n', 'off'];
+    
+            // Check true values first
             if (in_array($value, $trueValues, true)) {
                 return 1;
             }
-
+    
+            // Then check false values
             if (in_array($value, $falseValues, true)) {
                 return 0;
             }
         }
-
+    
         // For numeric values
         if (is_numeric($value)) {
             return $value ? 1 : 0;
         }
-
+    
         // Default to 0
         return 0;
     }
