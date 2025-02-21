@@ -25,7 +25,17 @@ class ProductImporter extends Importer
                 ->rules(['required', 'string', 'max:255']),
 
             ImportColumn::make('collections')
-                ->rules(['nullable', 'string']),
+                ->rules(['nullable', 'string'])
+                ->relationship(resolveUsing: function (string $state): ?Collection {
+                    $names = array_map('trim', explode(',', $state));
+                    return Collection::query()
+                        ->where('name', $names[0])
+                        ->first() ?? Collection::create([
+                            'name' => $names[0],
+                            'slug' => Str::slug($names[0]),
+                            'is_visible' => true
+                        ]);
+                }),
 
             ImportColumn::make('price')
                 ->requiredMapping()
@@ -33,14 +43,14 @@ class ProductImporter extends Importer
 
             ImportColumn::make('sku')
                 ->requiredMapping()
-                ->rules(['required', 'string', Rule::unique('products', 'sku')->ignore(request('record'))]),
+                ->rules(['required', 'string']),
 
             ImportColumn::make('stock')
                 ->requiredMapping()
-                ->rules(['required', 'integer', 'min:0']),
+                ->rules(['required', 'numeric', 'min:0']),
 
             ImportColumn::make('safety_stock')
-                ->rules(['nullable', 'integer', 'min:0']),
+                ->rules(['nullable', 'numeric', 'min:0']),
 
             ImportColumn::make('status')
                 ->requiredMapping()
@@ -87,6 +97,10 @@ class ProductImporter extends Importer
             $sanitizedData = $this->sanitizeImportData($this->data);
             Log::info('Sanitized Record', ['record' => $sanitizedData]);
 
+            // Store collections data separately
+            $collectionsData = $this->data['collections'] ?? null;
+
+            // Create or update the product
             $product = Product::updateOrCreate(
                 ['sku' => $sanitizedData['sku']],
                 array_merge(
@@ -98,9 +112,23 @@ class ProductImporter extends Importer
                 )
             );
 
-            // Handle collections after product is created/updated
-            if (!empty($sanitizedData['collections'])) {
-                $this->syncProductCollections($product, $sanitizedData['collections']);
+            // Handle additional collections
+            if ($collectionsData) {
+                $collectionNames = array_map('trim', explode(',', $collectionsData));
+                if (count($collectionNames) > 1) {
+                    // Skip the first name as it's handled by the relationship
+                    array_shift($collectionNames);
+                    $collections = collect($collectionNames)->map(function ($name) {
+                        return Collection::firstOrCreate(
+                            ['name' => $name],
+                            [
+                                'slug' => Str::slug($name),
+                                'is_visible' => true
+                            ]
+                        );
+                    });
+                    $product->collections()->syncWithoutDetaching($collections->pluck('id'));
+                }
             }
 
             return $product;
@@ -117,82 +145,36 @@ class ProductImporter extends Importer
 
     protected function sanitizeImportData(array $data): array
     {
-        return [
+        $sanitized = [
             'name' => trim($data['name'] ?? ''),
-            'collections' => $data['collections'] ?? '',
-            'price' => $this->parseFloat($data['price'] ?? 0),
+            'price' => (float)($data['price'] ?? 0),
             'sku' => trim($data['sku'] ?? ''),
-            'stock' => $this->parseInt($data['stock'] ?? 0),
-            'safety_stock' => $this->parseInt($data['safety_stock'] ?? 0),
+            'stock' => (int)($data['stock'] ?? 0),
+            'safety_stock' => (int)($data['safety_stock'] ?? 0),
             'status' => trim($data['status'] ?? 'draft'),
-            'is_visible' => $this->parseBool($data['is_visible'] ?? false),
-            'is_featured' => $this->parseBool($data['is_featured'] ?? false),
-            'in_stock' => $this->parseBool($data['in_stock'] ?? false),
-            'on_sale' => $this->parseBool($data['on_sale'] ?? false),
             'description' => trim($data['description'] ?? ''),
-            'user_id' => $this->parseInt($data['user_id'] ?? Filament::auth()->id() ?? 1),
-            'images' => $this->parseArray($data['images'] ?? ['/images/default_image.png']),
-            'discount_price' => $this->parseFloat($data['discount_price'] ?? 0),
-            'discount_to' => $data['discount_to'] ? Carbon::parse($data['discount_to']) : null,
+            'user_id' => (int)($data['user_id'] ?? Filament::auth()->id() ?? 1),
+            'discount_price' => $data['discount_price'] ?? 0,
+            'discount_to' => $data['discount_to'],
         ];
-    }
 
-    protected function syncProductCollections(Product $product, $collectionsData): void
-    {
-        if (empty($collectionsData)) {
-            return;
+        // Handle boolean fields
+        foreach (['is_visible', 'is_featured', 'in_stock', 'on_sale'] as $boolField) {
+            $sanitized[$boolField] = strtoupper(trim($data[$boolField] ?? 'false')) === 'TRUE' ? 1 : 0;
         }
 
-        $collectionNames = is_string($collectionsData) 
-            ? array_filter(array_map('trim', explode(',', $collectionsData)))
-            : (array)$collectionsData;
-
-        $collectionIds = collect($collectionNames)
-            ->map(function ($name) {
-                return Collection::firstOrCreate(
-                    ['name' => trim($name)],
-                    [
-                        'slug' => Str::slug(trim($name)),
-                        'is_visible' => true
-                    ]
-                )->id;
-            })
-            ->toArray();
-
-        $product->collections()->sync($collectionIds);
-    }
-
-    protected function parseFloat($value): float
-    {
-        if (is_numeric($value)) {
-            return (float)$value;
-        }
-        
-        if (is_string($value)) {
-            $value = str_replace(',', '.', trim($value));
-            return (float)$value;
-        }
-        
-        return 0.0;
-    }
-
-    protected function parseInt($value): int
-    {
-        return filter_var($value, FILTER_VALIDATE_INT) ?: 0;
-    }
-
-    protected function parseBool($value): int
-    {
-        if (is_bool($value)) {
-            return $value ? 1 : 0;
+        // Handle images
+        if (!empty($data['images'])) {
+            if (is_string($data['images']) && str_starts_with($data['images'], '/')) {
+                $sanitized['images'] = [$data['images']];
+            } else {
+                $sanitized['images'] = $this->parseArray($data['images']);
+            }
+        } else {
+            $sanitized['images'] = ['/images/default_image.png'];
         }
 
-        if (is_string($value)) {
-            $value = strtolower(trim($value));
-            return in_array($value, ['1', 'true', 'yes', 'y', 'on'], true) ? 1 : 0;
-        }
-
-        return filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ? 1 : 0;
+        return $sanitized;
     }
 
     protected function parseArray($value): array
@@ -202,6 +184,10 @@ class ProductImporter extends Importer
         }
 
         if (is_string($value)) {
+            if ($value === '[]' || $value === '{}') {
+                return [];
+            }
+
             $decoded = json_decode($value, true);
             if (json_last_error() === JSON_ERROR_NONE) {
                 return $decoded;
