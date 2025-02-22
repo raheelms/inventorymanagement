@@ -19,6 +19,7 @@
                                     </a>
                                 </li>        
                             @endforeach
+
                             <li>
                             <a href="#" class="font-medium text-base leading-4 text-emerald-600">Terms of Use</a>
                             </li>
@@ -57,9 +58,9 @@
                             @endif
                         </div>
                         
-                        @if ($article->content)
+                        @if ($article->description)
                             <p class="font-normal text-md leading-4 text-gray-500 lg:mb-4 mb-4">
-                                {!! tiptap_converter()->asHTML($article->content ?? '', toc: true, maxDepth: 4) !!}
+                                {!! tiptap_converter()->asHTML($article->description ?? '', toc: true, maxDepth: 4) !!}
                             </p>
                         @endif
 

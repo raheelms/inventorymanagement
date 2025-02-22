@@ -89,7 +89,7 @@ class ArticleResource extends Resource
                                 ->required()
                                 ->searchable(),
         
-                            TiptapEditor::make(name: 'content')
+                            TiptapEditor::make(name: 'description')
                                 ->output(TiptapOutput::Json)
                                 ->columnSpanFull(),
         

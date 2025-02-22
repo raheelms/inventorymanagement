@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Route;
 require __DIR__.'/auth.php';
 
 Route::get('/articles/{article:slug}', ArticlePage::class)->name('article.show');
-Route::get('/categories/{slug}', CategoriesPage::class)->name('category.show');
+Route::get('/categories/{category:slug}', CategoriesPage::class)->name('category.show');
 Route::get('/products/{slug}', ProductPage::class)->name('product-page.show');
 Route::get('/collections', CollectionsPage::class);
 Route::get('/collections/{slug}', CollectionPage::class)->name("collections.show");

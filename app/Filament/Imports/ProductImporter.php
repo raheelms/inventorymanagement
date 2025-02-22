@@ -20,195 +20,129 @@ class ProductImporter extends Importer
     public static function getColumns(): array
     {
         return [
-            ImportColumn::make('name')
-                ->requiredMapping()
-                ->rules(['required', 'string', 'max:255']),
-
-            ImportColumn::make('collections')
-                ->rules(['nullable', 'string'])
-                ->relationship(resolveUsing: function (string $state): ?Collection {
-                    $names = array_map('trim', explode(',', $state));
-                    return Collection::query()
-                        ->where('name', $names[0])
-                        ->first() ?? Collection::create([
-                            'name' => $names[0],
-                            'slug' => Str::slug($names[0]),
-                            'is_visible' => true
-                        ]);
-                }),
-
-            ImportColumn::make('price')
-                ->requiredMapping()
-                ->rules(['required', 'numeric', 'min:0']),
-
-            ImportColumn::make('sku')
-                ->requiredMapping()
-                ->rules(['required', 'string']),
-
-            ImportColumn::make('stock')
-                ->requiredMapping()
-                ->rules(['required', 'numeric', 'min:0']),
-
-            ImportColumn::make('safety_stock')
-                ->rules(['nullable', 'numeric', 'min:0']),
-
-            ImportColumn::make('status')
-                ->requiredMapping()
-                ->rules(['required', Rule::in(['published', 'draft', 'archived', 'discontinued'])]),
-
-            ImportColumn::make('is_visible')
-                ->requiredMapping()
-                ->rules(['required', 'boolean']),
-
-            ImportColumn::make('is_featured')
-                ->requiredMapping()
-                ->rules(['required', 'boolean']),
-
-            ImportColumn::make('in_stock')
-                ->requiredMapping()
-                ->rules(['required', 'boolean']),
-
-            ImportColumn::make('on_sale')
-                ->requiredMapping()
-                ->rules(['required', 'boolean']),
-
-            ImportColumn::make('description')
-                ->rules(['nullable', 'string']),
-
-            ImportColumn::make('user_id')
-                ->rules(['nullable', 'integer', 'exists:users,id']),
-
-            ImportColumn::make('images')
-                ->rules(['nullable']),
-
-            ImportColumn::make('discount_price')
-                ->rules(['nullable', 'numeric', 'min:0']),
-
-            ImportColumn::make('discount_to')
-                ->rules(['nullable', 'date']),
+            ImportColumn::make('name')->requiredMapping()->rules(['required', 'string', 'max:255']),
+            ImportColumn::make('collections')->rules(['nullable', 'string']),
+            ImportColumn::make('price')->requiredMapping()->rules(['required', 'numeric', 'min:0']),
+            ImportColumn::make('sku')->requiredMapping()->rules(['required', 'string', 'max:255']),
+            ImportColumn::make('stock')->requiredMapping()->rules(['required', 'integer', 'min:0']),
+            ImportColumn::make('safety_stock')->rules(['nullable', 'integer', 'min:0']),
+            ImportColumn::make('status')->requiredMapping()->rules(['required', Rule::in(['published', 'draft', 'archived', 'discontinued'])]),
+            ImportColumn::make('is_visible')->requiredMapping()->rules(['required']),
+            ImportColumn::make('is_featured')->requiredMapping()->rules(['required']),
+            ImportColumn::make('in_stock')->requiredMapping()->rules(['required']),
+            ImportColumn::make('on_sale')->requiredMapping()->rules(['required']),
+            ImportColumn::make('description')->rules(['nullable', 'string']),
+            ImportColumn::make('user_id')->rules(['nullable', 'integer', 'exists:users,id']),
+            ImportColumn::make('images')->rules(['nullable', 'string']),
+            ImportColumn::make('taxes')->rules(['nullable', 'numeric', 'min:0']),
+            ImportColumn::make('discount_price')->rules(['nullable', 'numeric', 'min:0']),
+            ImportColumn::make('discount_to')->rules(['nullable', 'date']),
+            ImportColumn::make('data')->rules(['nullable', 'string']),
+            ImportColumn::make('tags')->rules(['nullable', 'string']),
         ];
     }
 
     public function resolveRecord(): ?Product
     {
         try {
-            Log::info('Raw Import Data', ['data' => $this->data]);
-
-            $sanitizedData = $this->sanitizeImportData($this->data);
-            Log::info('Sanitized Record', ['record' => $sanitizedData]);
-
-            // Store collections data separately
-            $collectionsData = $this->data['collections'] ?? null;
-
-            // Create or update the product
-            $product = Product::updateOrCreate(
-                ['sku' => $sanitizedData['sku']],
-                array_merge(
-                    $sanitizedData,
-                    [
-                        'slug' => Str::slug($sanitizedData['name']),
-                        'published_at' => now(),
-                    ]
-                )
-            );
-
-            // Handle additional collections
-            if ($collectionsData) {
-                $collectionNames = array_map('trim', explode(',', $collectionsData));
-                if (count($collectionNames) > 1) {
-                    // Skip the first name as it's handled by the relationship
-                    array_shift($collectionNames);
-                    $collections = collect($collectionNames)->map(function ($name) {
-                        return Collection::firstOrCreate(
-                            ['name' => $name],
-                            [
-                                'slug' => Str::slug($name),
-                                'is_visible' => true
-                            ]
-                        );
-                    });
-                    $product->collections()->syncWithoutDetaching($collections->pluck('id'));
+            if (empty($this->data['sku'])) {
+                Log::warning('Skipping product import: SKU is missing.', $this->data);
+                return null;
+            }
+    
+            // Convert boolean values
+            foreach (['is_visible', 'is_featured', 'in_stock', 'on_sale'] as $field) {
+                if (isset($this->data[$field])) {
+                    $this->data[$field] = strtoupper($this->data[$field]) === 'TRUE' ? 1 : 0;
                 }
             }
-
+    
+            // Ensure numeric fields have default values
+            $numericFields = [
+                'price' => 0,
+                'discount_price' => 0,
+                'stock' => 0,
+                'safety_stock' => 0,
+                'taxes' => 0,
+                'user_id' => Filament::auth()->id() ?? 1
+            ];
+    
+            foreach ($numericFields as $field => $defaultValue) {
+                $this->data[$field] = isset($this->data[$field]) && $this->data[$field] !== '' 
+                    ? (float)$this->data[$field] 
+                    : $defaultValue;
+            }
+    
+            // Get collections data before we start modifying the data array
+            $collectionsData = $this->data['collections'] ?? null;
+            unset($this->data['collections']); // Remove collections from data array
+    
+            $product = Product::firstOrNew(['sku' => $this->data['sku']]);
+            
+            $product->fill([
+                'name' => $this->data['name'],
+                'slug' => Str::slug($this->data['name']),
+                'description' => $this->data['description'] ?? null,
+                'price' => $this->data['price'],
+                'discount_price' => $this->data['discount_price'],
+                'stock' => $this->data['stock'],
+                'safety_stock' => $this->data['safety_stock'],
+                'status' => $this->data['status'] ?? 'draft',
+                'is_visible' => $this->data['is_visible'],
+                'is_featured' => $this->data['is_featured'],
+                'in_stock' => $this->data['in_stock'],
+                'on_sale' => $this->data['on_sale'],
+                'user_id' => $this->data['user_id'],
+                'discount_to' => !empty($this->data['discount_to']) ? Carbon::parse($this->data['discount_to']) : null,
+                'taxes' => $this->data['taxes'],
+                'data' => $this->data['data'] ?? '{}',
+                'tags' => $this->data['tags'] ?? '[]',
+                'published_at' => $product->exists ? $product->published_at : now(),
+            ]);
+    
+            if (!empty($this->data['images'])) {
+                $product->images = str_starts_with($this->data['images'], '/') 
+                    ? [$this->data['images']] 
+                    : ['/images/default_image.png'];
+            }
+    
+            // Save product first
+            $product->save();
+    
+            // Then handle collections
+            if (!empty($collectionsData)) {
+                $collectionNames = array_map('trim', explode(',', $collectionsData));
+                
+                $collectionIds = collect($collectionNames)->map(function ($name) {
+                    return Collection::firstOrCreate(
+                        ['name' => trim($name)],
+                        [
+                            'slug' => Str::slug(trim($name)),
+                            'is_visible' => true
+                        ]
+                    )->id;
+                });
+    
+                $product->collections()->sync($collectionIds);
+            }
+    
             return $product;
-
+    
         } catch (\Exception $e) {
             Log::error('Product Import Error', [
                 'message' => $e->getMessage(),
-                'data' => $this->data,
-                'trace' => $e->getTraceAsString()
+                'data' => $this->data
             ]);
-            throw $e;
+            return null;
         }
-    }
-
-    protected function sanitizeImportData(array $data): array
-    {
-        $sanitized = [
-            'name' => trim($data['name'] ?? ''),
-            'price' => (float)($data['price'] ?? 0),
-            'sku' => trim($data['sku'] ?? ''),
-            'stock' => (int)($data['stock'] ?? 0),
-            'safety_stock' => (int)($data['safety_stock'] ?? 0),
-            'status' => trim($data['status'] ?? 'draft'),
-            'description' => trim($data['description'] ?? ''),
-            'user_id' => (int)($data['user_id'] ?? Filament::auth()->id() ?? 1),
-            'discount_price' => $data['discount_price'] ?? 0,
-            'discount_to' => $data['discount_to'],
-        ];
-
-        // Handle boolean fields
-        foreach (['is_visible', 'is_featured', 'in_stock', 'on_sale'] as $boolField) {
-            $sanitized[$boolField] = strtoupper(trim($data[$boolField] ?? 'false')) === 'TRUE' ? 1 : 0;
-        }
-
-        // Handle images
-        if (!empty($data['images'])) {
-            if (is_string($data['images']) && str_starts_with($data['images'], '/')) {
-                $sanitized['images'] = [$data['images']];
-            } else {
-                $sanitized['images'] = $this->parseArray($data['images']);
-            }
-        } else {
-            $sanitized['images'] = ['/images/default_image.png'];
-        }
-
-        return $sanitized;
-    }
-
-    protected function parseArray($value): array
-    {
-        if (is_array($value)) {
-            return $value;
-        }
-
-        if (is_string($value)) {
-            if ($value === '[]' || $value === '{}') {
-                return [];
-            }
-
-            $decoded = json_decode($value, true);
-            if (json_last_error() === JSON_ERROR_NONE) {
-                return $decoded;
-            }
-
-            return array_filter(array_map('trim', explode(',', $value)));
-        }
-
-        return [];
     }
 
     public static function getCompletedNotificationBody(Import $import): string
     {
-        $body = 'Your product import has completed and ' . 
-            number_format($import->successful_rows) . ' ' . 
-            str('row')->plural($import->successful_rows) . ' imported.';
+        $body = 'Your product import has completed and ' . number_format($import->successful_rows) . ' ' . str('row')->plural($import->successful_rows) . ' imported.';
 
-        $failedRowsCount = $import->getFailedRowsCount();
-        if ($failedRowsCount > 0) {
-            $body .= ' ' . number_format($failedRowsCount) . ' ' . 
-                str('row')->plural($failedRowsCount) . ' failed to import.';
+        if ($failedRowsCount = $import->getFailedRowsCount()) {
+            $body .= ' ' . number_format($failedRowsCount) . ' ' . str('row')->plural($failedRowsCount) . ' failed to import.';
         }
 
         return $body;

@@ -6,22 +6,24 @@ use Illuminate\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use App\Models\Article as ArticleModel;
-use Datlechin\FilamentMenuBuilder\Models\Menu;
 
 class ArticlePage extends Component
 {
     public ArticleModel $article;
 
-    public function mount(): void
+    public function mount(ArticleModel $article): void
     {
+        $this->article = $article;
         views($this->article)->record();
     }
 
-    #[Layout('components.layouts.app')]
+    #[Layout('components.layouts.app', ['seoData' => 'article'])]
     public function render(): View
     {
         return view('livewire.pages.article-page', [
-            'articles' => ArticlePage::all()
+            'articles' => ArticleModel::where('id', '!=', $this->article->id)
+                ->limit(5)
+                ->get()
         ]);
     }
 }
