@@ -14,6 +14,17 @@ class ProductImporter extends Importer
 {
     // Store collections data separately
     protected $importedCollections = null;
+    protected static $truthyValues =[
+        "TRUE",
+        "true",
+        "True",
+        "Yes",
+        "YES",
+        'yes',
+        '1',
+        1,
+        true,
+    ];
     
     protected static ?string $model = Product::class;
 
@@ -118,6 +129,11 @@ class ProductImporter extends Importer
                 ->label('Price'),
                 
             ImportColumn::make('discount_price')
+                ->castStateUsing(function ($state) {
+                    if (blank($state)) {
+                        return 0;
+                    }
+                })
                 ->label('Discount Price'),
                 
             ImportColumn::make('discount_to')
@@ -168,18 +184,34 @@ class ProductImporter extends Importer
                 
             ImportColumn::make('is_visible')
                 ->label('Visibility')
+                ->castStateUsing(function ($state) {
+                    $truthyValues = self::$truthyValues;
+                    return in_array($state, $truthyValues, true);
+                })
                 ->guess(['Visibility']),
                 
             ImportColumn::make('is_featured')
                 ->label('Featured')
+                ->castStateUsing(function ($state) {
+                    $truthyValues = self::$truthyValues;
+                    return in_array($state, $truthyValues, true);
+                })
                 ->guess(['Featured']),
                 
             ImportColumn::make('in_stock')
                 ->label('In Stock')
+                ->castStateUsing(function ($state) {
+                    $truthyValues = self::$truthyValues;
+                    return in_array($state, $truthyValues, true);
+                })
                 ->guess(['In Stock']),
                 
             ImportColumn::make('on_sale')
                 ->label('On Sale')
+                ->castStateUsing(function ($state) {
+                    $truthyValues = self::$truthyValues;
+                    return in_array($state, $truthyValues, true);
+                })
                 ->guess(['On Sale']),
                 
                 ImportColumn::make('tags')
@@ -271,29 +303,30 @@ class ProductImporter extends Importer
 
     public function resolveRecord(): ?Product
     {
-        dd($this->data);
-        // Store collections data separately for later use
-        if (isset($this->data['_collections'])) {
-            $this->importedCollections = $this->data['_collections'];
-            
-            // Remove from data to prevent saving to the database
-            unset($this->data['_collections']);
-        }
-        // Find by SKU first
-        if (isset($this->data['sku']) && !empty($this->data['sku'])) {
+        // Extract and store collections separately
+        $collectionNames = $this->data['collections'] ?? [];
+        $this->importedCollections = $collectionNames;
+        unset($this->data['collections']); 
+
+        if (!empty($this->data['sku'])) {
             $product = Product::where('sku', $this->data['sku'])->first();
-            if ($product) return $product;
         }
-        
-        // Find by ID as fallback
-        if (isset($this->data['id']) && !empty($this->data['id'])) {
+
+        if (empty($product) && !empty($this->data['id'])) {
             $product = Product::find($this->data['id']);
-            if ($product) return $product;
         }
-        
-        // Create new
-        return new Product();
+
+        if (empty($product)) {
+            $product = new Product();
+        }
+
+        if (!empty($product->id)) {
+            $this->attachCollectionToProduct($collectionNames, $product);
+        }
+
+        return $product;
     }
+
 
     protected function beforeSave(): void
     {
@@ -313,46 +346,46 @@ class ProductImporter extends Importer
         }
     }
     
-    protected function afterSave(): void
-    {
-        // Process collections relationship if data was captured
-        if (!empty($this->importedCollections)) {
-            $collectionsData = $this->importedCollections;
-            $collectionNames = [];
+    // protected function afterSave(): void
+    // {
+    //     // Process collections relationship if data was captured
+    //     if (!empty($this->importedCollections)) {
+    //         $collectionsData = $this->importedCollections;
+    //         $collectionNames = [];
             
-            // Parse collections data
-            if (is_string($collectionsData) && str_starts_with(trim($collectionsData), '[')) {
-                try {
-                    $parsed = json_decode($collectionsData, true);
-                    if (json_last_error() === JSON_ERROR_NONE && is_array($parsed)) {
-                        $collectionNames = $parsed;
-                    }
-                } catch (\Exception $e) {
-                    // Continue with string processing
-                }
-            } else if (is_string($collectionsData)) {
-                if (str_contains($collectionsData, ',')) {
-                    $collectionNames = array_map('trim', explode(',', $collectionsData));
-                } else {
-                    $collectionNames = [trim($collectionsData)];
-                }
-            } else if (is_array($collectionsData)) {
-                $collectionNames = $collectionsData;
-            }
+    //         // Parse collections data
+    //         if (is_string($collectionsData) && str_starts_with(trim($collectionsData), '[')) {
+    //             try {
+    //                 $parsed = json_decode($collectionsData, true);
+    //                 if (json_last_error() === JSON_ERROR_NONE && is_array($parsed)) {
+    //                     $collectionNames = $parsed;
+    //                 }
+    //             } catch (\Exception $e) {
+    //                 // Continue with string processing
+    //             }
+    //         } else if (is_string($collectionsData)) {
+    //             if (str_contains($collectionsData, ',')) {
+    //                 $collectionNames = array_map('trim', explode(',', $collectionsData));
+    //             } else {
+    //                 $collectionNames = [trim($collectionsData)];
+    //             }
+    //         } else if (is_array($collectionsData)) {
+    //             $collectionNames = $collectionsData;
+    //         }
             
-            // Find collection IDs using pluck method
-            if (!empty($collectionNames)) {
-                $collectionIds = Collection::whereIn('name', $collectionNames)
-                    ->pluck('id')
-                    ->toArray();
+    //         // Find collection IDs using pluck method
+    //         if (!empty($collectionNames)) {
+    //             $collectionIds = Collection::whereIn('name', $collectionNames)
+    //                 ->pluck('id')
+    //                 ->toArray();
                 
-                // Sync collections
-                if (!empty($collectionIds)) {
-                    $this->record->collections()->sync($collectionIds);
-                }
-            }
-        }
-    }
+    //             // Sync collections
+    //             if (!empty($collectionIds)) {
+    //                 $this->record->collections()->sync($collectionIds);
+    //             }
+    //         }
+    //     }
+    // }
 
     public static function getCompletedNotificationBody(Import $import): string
     {
@@ -363,5 +396,41 @@ class ProductImporter extends Importer
         }
 
         return $body;
+    }
+
+    private function attachCollectionToProduct($collectionNames, $product)
+    {
+        // Parse collections data
+        if (is_string($collectionNames) && str_starts_with(trim($collectionNames), '[')) {
+            try {
+                $parsed = json_decode($collectionNames, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($parsed)) {
+                    $collectionNames = $parsed;
+                }
+            } catch (\Exception $e) {
+                // Continue with string processing
+            }
+        } else if (is_string($collectionNames)) {
+            if (str_contains($collectionNames, ',')) {
+                $collectionNames = array_map('trim', explode(',', $collectionNames));
+            } else {
+                $collectionNames = [trim($collectionNames)];
+            }
+        } else if (is_array($collectionNames)) {
+            $collectionNames = $collectionNames;
+        }
+        $collectionIds =[];
+        // Find collection IDs using pluck method
+        if (!empty($collectionNames)) {
+            foreach ($collectionNames as $collectionName) {
+                $collection = Collection::firstOrCreate(['name' => trim($collectionName), 'slug' => Str::slug(trim($collectionName))]);
+                $collectionIds[] = $collection->id;
+            }
+    
+            // Sync collections
+            if (!empty($collectionIds)) {
+                $product->collections()->sync($collectionIds);
+            }
+        }
     }
 }
