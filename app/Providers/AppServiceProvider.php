@@ -6,6 +6,7 @@ use Filament\Pages\Dashboard;
 use Illuminate\Support\ServiceProvider;
 use Z3d0X\FilamentFabricator\Forms\Components\PageBuilder;
 use Z3d0X\FilamentFabricator\Resources\PageResource;
+use Illuminate\Support\Facades\Blade;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -31,8 +32,6 @@ class AppServiceProvider extends ServiceProvider
             PageResource::navigationGroup('Settings');
             PageResource::navigationSort(1);
             PageResource::navigationIcon('heroicon-o-cube');
-        }
-
-        
+        }        
     }
 }

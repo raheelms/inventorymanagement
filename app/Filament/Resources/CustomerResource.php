@@ -348,17 +348,33 @@ class CustomerResource extends Resource
 
                 Tables\Columns\TextColumn::make('shipping_address')
                     ->label(__('Shipping Address'))
-                    ->visible(true)
-                    ->extraAttributes(['wire:poll' => '5s']),
+                    ->getStateUsing(function ($record) {
+                        // Calculate shipping address from components
+                        return trim($record->shipping_street_name . ' ' . $record->shipping_house_number);
+                    })
+                    ->badge()
+                    ->color('success')                    
+                    ->visible(true),
 
                 Tables\Columns\TextColumn::make('billing_address')
                     ->label(__('Billing Address'))
-                    ->visible(true)
-                    ->placeholder('Use shipping address')
-                    ->extraAttributes(['wire:poll' => '5s'])
-                    ->formatStateUsing(fn ($state, $record) => 
-                    optional($record)->use_shipping_address ? 'Use shipping address' : $state // Return placeholder or actual billing address
-                    ),
+                    ->getStateUsing(function ($record) {
+                        if ($record->use_shipping_address) {
+                            return 'Use shipping address';
+                        }
+                        // Return calculated billing address or blank if empty
+                        $billingAddress = trim($record->billing_street_name . ' ' . $record->billing_house_number);
+                        return !empty($billingAddress) ? $billingAddress : '';
+                    })
+                    ->badge()
+                    ->color(function ($state) {
+                        if ($state === 'Use shipping address') {
+                            return 'info';
+                        } else {
+                            return 'success';
+                        }
+                    })
+                    ->visible(true),
 
                 Tables\Columns\TextColumn::make( name: 'created_at')
                     ->label(__('Created At'))

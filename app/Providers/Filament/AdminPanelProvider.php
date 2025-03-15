@@ -66,6 +66,7 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->databaseNotifications()
             ->viteTheme('resources/css/filament/admin/theme.css')
+            //->maxContentWidth('7xl')
             ->colors([
                 'custom' => '#087260',
                 'primary' => Color::Indigo,

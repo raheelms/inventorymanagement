@@ -16,6 +16,7 @@ use FilamentTiptapEditor\TiptapEditor;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use RalphJSmit\Filament\SEO\SEO;
 
@@ -138,8 +139,8 @@ class CollectionResource extends Resource
             ->columns([
                 Tables\Columns\ImageColumn::make(name: 'images')
                     ->label(label: 'Image')
-                    ->width(40)
-                    ->height(40)
+                    ->width(60)
+                    ->height(60)
                     ->limit(1)
                     ->defaultImageUrl('/images/default_image.png'),
 

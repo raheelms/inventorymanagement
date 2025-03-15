@@ -21,6 +21,7 @@ use FilamentTiptapEditor\TiptapEditor;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use RalphJSmit\Filament\SEO\SEO;
 
@@ -69,7 +70,9 @@ class ProductResource extends Resource
                                                 Forms\Components\Select::make('collections')
                                                     ->preload()
                                                     ->multiple()
-                                                    ->relationship('collections', 'name')
+                                                    ->options(function () {
+                                                        return \App\Models\Collection::pluck('name', 'id');
+                                                    })
                                                     ->required()
                                                     ->searchable(),
 
@@ -159,8 +162,8 @@ class ProductResource extends Resource
                                             ->collapsed(false)
                                             ->schema([
                                                 Forms\Components\KeyValue::make('data')
-                                                ->label(__('Additional Details'))
-                                                ->columnSpanFull(),
+                                                    ->label(__('Additional Details'))
+                                                    ->columnSpanFull(),
                                             ])
                                             ->columns(1)
                                             ->columnSpan(2),

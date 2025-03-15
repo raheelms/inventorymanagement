@@ -21,6 +21,7 @@ class ListProducts extends ListRecords
             ->importer(ProductImporter::class)
             ->label('Import')
             ->icon('heroicon-o-cloud-arrow-up')
+            ->csvDelimiter(';')
             //->outlined()
             ->color('purple-500'),
 

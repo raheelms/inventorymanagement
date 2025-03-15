@@ -21,6 +21,7 @@ class ListCustomers extends ListRecords
                 ->importer(CustomerImporter::class)
                 ->label('Import')
                 ->icon('heroicon-o-cloud-arrow-up')
+                ->csvDelimiter(';')
                 //->outlined()
                 ->color('purple-500'),
 

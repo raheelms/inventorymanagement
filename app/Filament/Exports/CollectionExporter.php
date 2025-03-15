@@ -6,23 +6,30 @@ use App\Models\Collection;
 use Filament\Actions\Exports\ExportColumn;
 use Filament\Actions\Exports\Exporter;
 use Filament\Actions\Exports\Models\Export;
+use Illuminate\Database\Eloquent\Builder;
 
 class CollectionExporter extends Exporter
 {
     protected static ?string $model = Collection::class;
 
+    public static function modifyQuery(Builder $query): Builder
+    {
+        return $query;
+    }
+
     public static function getColumns(): array
     {
         return [
-            ExportColumn::make('name'),
-            // ExportColumn::make('slug'),
-            ExportColumn::make('description'),
-            // ExportColumn::make('images'), // json
-            // ExportColumn::make('media_id'),
-            // Exportcolumn::make('is_visible'), // boolean
-            // Exportcolumn::make('parent_id'),
-            // Exportcolumn::make('tags'), // json
-            // Exportcolumn::make('data'), // json
+            ExportColumn::make('id')->label('ID'),            
+            ExportColumn::make('name')->label('Name'),            
+            ExportColumn::make('slug')->label('Slug'),
+            ExportColumn::make('description')->label('Description')->listAsJson(),            
+            ExportColumn::make('images')->label('Images')->listAsJson(),            
+            ExportColumn::make('media_id')->label('Media'),
+            ExportColumn::make('parent_id')->label('Parent'),            
+            ExportColumn::make('is_visible')->label('Visibility')->formatStateUsing(fn (bool $state): string => $state ? 'Visible' : 'Hidden'),            
+            ExportColumn::make('tags')->label('Tags')->listAsJson(),            
+            ExportColumn::make('data')->label('Data')->listAsJson(),
         ];
     }
 

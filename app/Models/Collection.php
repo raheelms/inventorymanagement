@@ -91,9 +91,13 @@ class Collection extends Model implements MenuPanelable
    protected $casts = [
        'description' => 'array',
        'images' => 'array',
-       'media_id' => 'array',
+       // 'media_id' => 'array',
        'tags' => 'array',
        'data' => 'array',
+       'is_visible' => 'boolean',
+       'is_featured' => 'boolean',
+       'in_stock' => 'boolean',
+       'on_sale' => 'boolean',
    ];
 
    /**
